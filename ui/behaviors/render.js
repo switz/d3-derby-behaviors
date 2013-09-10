@@ -45,19 +45,38 @@
       .y(y)
       .scaleExtent([0.001, 100]);
 
+    var holdingS = false;
+
+    var xCoord;
+
     var drag = d3.behavior.drag()
       .on("drag", function(d){
         // prevent pan
         d3.event.sourceEvent.stopImmediatePropagation();
         d3.event.sourceEvent.stopPropagation();
 
-        // transform the event pixels into the zoom/panned coordinate frame
-        var attrs = {
-          x: d.value.x + (x.invert(d3.event.dx) - x.invert(0)),
-          y: d.value.y + (y.invert(d3.event.dy) - y.invert(0)),
-        };
+        var radius = d.value.r;
+
+        if (holdingS && xCoord) {
+          radius = Math.sqrt((radius * radius) + (d3.event.dx - xCoord) * 20);
+          if (radius < 0) radius = 0
+          else if (radius > 100) radius = 100
+          var attrs = {
+            r: radius
+          }
+        }
+        else {
+          xCoord = d3.event.dx;
+          // transform the event pixels into the zoom/panned coordinate frame
+          var attrs = {
+            x: d.value.x + (x.invert(xCoord) - x.invert(0)),
+            y: d.value.y + (y.invert(d3.event.dy) - y.invert(0))
+          };
+        }
         updateItem(d.key, attrs);
       });
+
+    drag.on("dragend", function(d){ xCoord = 0; });
 
     // event callbacks
     var resize = function(selection){
@@ -175,12 +194,19 @@
             return "translate(" + x(d.value.x) + "," + y(d.value.y) + ")";
           })
           .select("circle")
-            .attr("r", 10 * sx);
+            .attr("r", function(d){
+              if (!d.value.r) d.value.r = sx * 10;
+              return d.value.r;
+            });
       };
 
       // attach behaviors and other events
       d3.select(window)
-        .on("resize", function(){ resize(selection); });
+        .on("resize", function(){ resize(selection); })
+        .on("keydown", function(){
+          if (d3.event.keyCode === 83) holdingS = true;
+        })
+        .on("keyup", function() { holdingS = false })
 
       zoom
         .on("zoom", update);
